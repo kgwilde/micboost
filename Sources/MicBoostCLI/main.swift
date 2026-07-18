@@ -274,9 +274,29 @@ final class AtomicFlag {
 
 // MARK: - Entry point
 
+func printHelp() {
+    print("""
+    Usage: micboostctl <command>
+
+    Commands:
+      run           Prompt for device, boost %, and bass boost dB (defaulting
+                     to your last choices), then start Mic Boost and show a
+                     live dashboard. Press s to toggle start/stop, q or
+                     Ctrl-C to stop and exit.
+      start         Start Mic Boost with the settings from the last run,
+                     with no prompts.
+      stop          Stop Mic Boost.
+      -h, --help    Show this help.
+
+    micboostctl launches MicBoost.app automatically if it isn't already
+    running.
+    """)
+}
+
 let arguments = CommandLine.arguments
 guard arguments.count > 1 else {
-    fail("Usage: micboostctl <run|start|stop>")
+    printHelp()
+    exit(1)
 }
 
 switch arguments[1] {
@@ -285,5 +305,8 @@ case "run":
     runDashboard()
 case "start": runStart()
 case "stop": runOneShot("STOP")
-default: fail("Usage: micboostctl <run|start|stop>")
+case "-h", "--help": printHelp()
+default:
+    printHelp()
+    exit(1)
 }

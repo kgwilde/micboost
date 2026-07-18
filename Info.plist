@@ -15,7 +15,7 @@
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
-    <string>10.15</string>
+    <string>12.0</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Mic Boost needs microphone access to apply gain and route the boosted signal to BlackHole.</string>
     <key>NSHighResolutionCapable</key>
