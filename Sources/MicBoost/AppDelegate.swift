@@ -7,17 +7,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var popover: NSPopover!
     private var popoverVC: MicBoostViewController!
     private var eventMonitor: Any?
+    private var controlServer: ControlServer!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
+        controlServer = ControlServer(engine: engine)
+        controlServer.start()
+
         popoverVC = MicBoostViewController(engine: engine)
-        popoverVC.onRunningChanged = { [weak self] isRunning in
-            self?.updateIcon(isRunning: isRunning)
-        }
+        // Load eagerly: the CLI can trigger engine.onStatusChange (which
+        // touches popoverVC's outlets) before the popover is ever shown.
+        _ = popoverVC.view
 
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 320, height: 250)
+        popover.contentSize = NSSize(width: 320, height: 300)
         popover.behavior = .transient
         popover.contentViewController = popoverVC
 
@@ -29,7 +33,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         engine.onStatusChange = { [weak self] message in
-            DispatchQueue.main.async { self?.popoverVC.updateStatus(message) }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.popoverVC.updateStatus(message)
+                self.updateIcon(isRunning: self.engine.isRunning)
+            }
         }
     }
 

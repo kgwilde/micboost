@@ -16,4 +16,6 @@ cp .build/release/MicBoost "$APP/Contents/MacOS/MicBoost"
 echo "Signing (ad-hoc)..."
 codesign --force --deep --sign - "$APP"
 
-echo "Done. Built $APP"
+cp .build/release/micboostctl ./micboostctl
+
+echo "Done. Built $APP and ./micboostctl"

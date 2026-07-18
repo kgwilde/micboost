@@ -3,11 +3,12 @@ import CoreAudio
 
 final class MicBoostViewController: NSViewController {
     private let engine: MicBoostEngine
-    var onRunningChanged: ((Bool) -> Void)?
 
     private var devicePopup: NSPopUpButton!
     private var boostSlider: NSSlider!
     private var boostLabel: NSTextField!
+    private var bassSlider: NSSlider!
+    private var bassLabel: NSTextField!
     private var levelMeter: NSLevelIndicator!
     private var statusLabel: NSTextField!
     private var toggleButton: NSButton!
@@ -25,7 +26,7 @@ final class MicBoostViewController: NSViewController {
     }
 
     override func loadView() {
-        let rect = NSRect(x: 0, y: 0, width: 320, height: 250)
+        let rect = NSRect(x: 0, y: 0, width: 320, height: 300)
         let content = NSView(frame: rect)
         buildUI(in: content)
         view = content
@@ -48,6 +49,7 @@ final class MicBoostViewController: NSViewController {
 
     func updateStatus(_ message: String) {
         statusLabel.stringValue = message
+        toggleButton.title = engine.isRunning ? "Stop" : "Start"
     }
 
     func refreshDevices() {
@@ -70,9 +72,9 @@ final class MicBoostViewController: NSViewController {
     // MARK: - UI
 
     private func buildUI(in content: NSView) {
-        content.addSubview(label("Level (post-boost):", frame: NSRect(x: 16, y: 216, width: 140, height: 20)))
+        content.addSubview(label("Level (post-boost):", frame: NSRect(x: 16, y: 266, width: 140, height: 20)))
 
-        levelMeter = NSLevelIndicator(frame: NSRect(x: 150, y: 212, width: 154, height: 20))
+        levelMeter = NSLevelIndicator(frame: NSRect(x: 150, y: 262, width: 154, height: 20))
         levelMeter.levelIndicatorStyle = .continuousCapacity
         levelMeter.minValue = 0
         levelMeter.maxValue = 1
@@ -80,14 +82,14 @@ final class MicBoostViewController: NSViewController {
         levelMeter.criticalValue = 0.95
         content.addSubview(levelMeter)
 
-        content.addSubview(label("Microphone:", frame: NSRect(x: 16, y: 172, width: 90, height: 20)))
+        content.addSubview(label("Microphone:", frame: NSRect(x: 16, y: 222, width: 90, height: 20)))
 
-        devicePopup = NSPopUpButton(frame: NSRect(x: 16, y: 148, width: 288, height: 26))
+        devicePopup = NSPopUpButton(frame: NSRect(x: 16, y: 198, width: 288, height: 26))
         content.addSubview(devicePopup)
 
-        content.addSubview(label("Boost:", frame: NSRect(x: 16, y: 108, width: 90, height: 20)))
+        content.addSubview(label("Boost:", frame: NSRect(x: 16, y: 158, width: 90, height: 20)))
 
-        boostSlider = NSSlider(frame: NSRect(x: 16, y: 84, width: 220, height: 26))
+        boostSlider = NSSlider(frame: NSRect(x: 16, y: 134, width: 220, height: 26))
         boostSlider.minValue = 0
         boostSlider.maxValue = 1000
         boostSlider.doubleValue = Double(engine.gain.current * 100)
@@ -95,8 +97,21 @@ final class MicBoostViewController: NSViewController {
         boostSlider.action = #selector(boostChanged)
         content.addSubview(boostSlider)
 
-        boostLabel = label("\(Int(boostSlider.doubleValue))%", frame: NSRect(x: 244, y: 88, width: 60, height: 20))
+        boostLabel = label("\(Int(boostSlider.doubleValue))%", frame: NSRect(x: 244, y: 138, width: 60, height: 20))
         content.addSubview(boostLabel)
+
+        content.addSubview(label("Bass boost:", frame: NSRect(x: 16, y: 108, width: 100, height: 20)))
+
+        bassSlider = NSSlider(frame: NSRect(x: 16, y: 84, width: 220, height: 26))
+        bassSlider.minValue = 0
+        bassSlider.maxValue = 18
+        bassSlider.doubleValue = Double(engine.bassBoostDB.current)
+        bassSlider.target = self
+        bassSlider.action = #selector(bassBoostChanged)
+        content.addSubview(bassSlider)
+
+        bassLabel = label("\(Int(bassSlider.doubleValue)) dB", frame: NSRect(x: 244, y: 88, width: 60, height: 20))
+        content.addSubview(bassLabel)
 
         toggleButton = NSButton(frame: NSRect(x: 16, y: 44, width: 100, height: 32))
         toggleButton.title = engine.isRunning ? "Stop" : "Start"
@@ -134,19 +149,19 @@ final class MicBoostViewController: NSViewController {
         engine.gain.current = Float(percent / 100.0)
     }
 
+    @objc private func bassBoostChanged() {
+        let db = bassSlider.doubleValue
+        bassLabel.stringValue = "\(Int(db)) dB"
+        engine.bassBoostDB.current = Float(db)
+    }
+
     @objc private func toggleEngine() {
         if engine.isRunning {
             engine.stop()
-            toggleButton.title = "Start"
-            onRunningChanged?(false)
             return
         }
 
         guard devicePopup.indexOfSelectedItem >= 0, devicePopup.indexOfSelectedItem < devices.count else { return }
         engine.start(micID: devices[devicePopup.indexOfSelectedItem].id)
-        if engine.isRunning {
-            toggleButton.title = "Stop"
-            onRunningChanged?(true)
-        }
     }
 }

@@ -1,3 +1,4 @@
 MicBoost.app/
+micboostctl
 .build/
 .swiftpm/

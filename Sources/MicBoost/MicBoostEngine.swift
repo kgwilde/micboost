@@ -16,8 +16,12 @@ final class MicBoostEngine {
     private let ring = RingBuffer(capacity: 48_000 * 2) // ~2s at 48kHz
     let gain = AtomicValue<Float>(1.0)
     let peakLevel = AtomicValue<Float>(0)
+    let bassBoostDB = AtomicValue<Float>(6)
+    private let bassFilter = LowShelfFilter()
 
     private(set) var isRunning = false
+    private(set) var currentDeviceName: String?
+    private var lastDeviceID: AudioDeviceID?
     var onStatusChange: ((String) -> Void)?
 
     func availableInputDevices() -> [(id: AudioDeviceID, name: String)] {
@@ -30,8 +34,44 @@ final class MicBoostEngine {
         AudioDevice.allIDs().first { AudioDevice.name(of: $0).contains("BlackHole") }
     }
 
+    /// Starts with whatever mic was last used (from either the menu bar
+    /// dropdown or a previous CLI start), falling back to the system default
+    /// input. Lets the CLI start/stop without knowing about device IDs.
+    func startWithLastOrDefaultDevice() {
+        configureAndStart(deviceName: nil, boostPercent: nil, bassDB: nil)
+    }
+
+    /// Used by `micboostctl run`: applies gain/bass settings chosen
+    /// interactively, resolves the named device (falling back to last-used,
+    /// then system default, then whatever's first if the name doesn't match
+    /// a currently available device, e.g. the headset got unplugged), and
+    /// starts.
+    func configureAndStart(deviceName: String?, boostPercent: Int?, bassDB: Int?) {
+        if let boostPercent {
+            gain.current = Float(boostPercent) / 100.0
+        }
+        if let bassDB {
+            bassBoostDB.current = Float(bassDB)
+        }
+
+        let candidates = availableInputDevices()
+        let systemDefault = AudioDevice.defaultInputID()
+        let resolvedID = deviceName.flatMap { name in candidates.first(where: { $0.name == name })?.id }
+            ?? lastDeviceID
+            ?? candidates.first(where: { $0.id == systemDefault })?.id
+            ?? candidates.first?.id
+
+        guard let deviceID = resolvedID else {
+            onStatusChange?("No input device available.")
+            return
+        }
+        start(micID: deviceID)
+    }
+
     func start(micID: AudioDeviceID) {
         guard !isRunning else { return }
+        lastDeviceID = micID
+        bassFilter.reset()
 
         guard let blackholeID = findBlackhole() else {
             onStatusChange?("BlackHole not found. Install it with \"brew install blackhole-2ch\", restart coreaudiod, then try again.")
@@ -55,7 +95,8 @@ final class MicBoostEngine {
             outputEngine?.prepare()
             try outputEngine?.start()
             isRunning = true
-            onStatusChange?("Running — \(AudioDevice.name(of: micID)) → BlackHole 2ch")
+            currentDeviceName = AudioDevice.name(of: micID)
+            onStatusChange?("Running: \(AudioDevice.name(of: micID)) to BlackHole 2ch")
         } catch {
             onStatusChange?("Failed to start: \(error.localizedDescription)")
         }
@@ -69,6 +110,7 @@ final class MicBoostEngine {
         inputEngine = nil
         outputEngine = nil
         isRunning = false
+        currentDeviceName = nil
         peakLevel.current = 0
         onStatusChange?("Stopped")
     }
@@ -132,13 +174,18 @@ final class MicBoostEngine {
             }
         }
 
+        bassFilter.updateIfNeeded(sampleRate: buffer.format.sampleRate, gainDB: bassBoostDB.current)
+
         let currentGain = gain.current
         var peak: Float = 0
         for i in 0..<frameLength {
+            // Bass boost runs before the gain/limiter so any low end it adds
+            // still gets caught by the soft limiter instead of clipping.
+            let shaped = bassFilter.process(mono[i])
             // tanh acts as a soft limiter: it boosts quiet signal roughly
             // linearly, then rounds off the peaks instead of hard clipping
             // once gain pushes the signal towards full scale.
-            mono[i] = tanhf(mono[i] * currentGain)
+            mono[i] = tanhf(shaped * currentGain)
             peak = max(peak, abs(mono[i]))
         }
 
