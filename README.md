@@ -53,11 +53,16 @@ open MicBoost.app
 
 ## Use
 
-1. Pick your real microphone from the dropdown (not BlackHole).
-2. Set the boost slider and click Start. The level meter shows the
-   post boost signal in real time.
-3. In the app you want boosted audio in (Zoom, Voice Memos, etc.), set the
+1. Click the mic icon in the menu bar to open the dropdown.
+2. Pick your real microphone from the dropdown (not BlackHole).
+3. Set the boost slider and click Start. The level meter shows the
+   post boost signal in real time. The menu bar icon fills in to show
+   it's running.
+4. In the app you want boosted audio in (Zoom, Voice Memos, etc.), set the
    input device to BlackHole 2ch.
+
+There's no Dock icon or window — click the mic icon again to reopen the
+dropdown, and use the Quit button in it to exit.
 
 ## How the gain works
 
