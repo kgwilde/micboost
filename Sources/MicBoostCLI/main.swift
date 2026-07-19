@@ -9,11 +9,24 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
+/// The actual path of the running binary. CommandLine.arguments[0] isn't
+/// reliable for this: when a shell resolves a command via PATH, it commonly
+/// passes argv[0] as the bare name typed by the user (e.g. "micboostctl"),
+/// not the resolved path, which breaks sibling-file lookups once this CLI
+/// is symlinked into PATH.
+func executablePath() -> URL {
+    var size: UInt32 = 0
+    _NSGetExecutablePath(nil, &size)
+    var buffer = [Int8](repeating: 0, count: Int(size))
+    _NSGetExecutablePath(&buffer, &size)
+    return URL(fileURLWithPath: String(cString: buffer))
+}
+
 /// `micboostctl` and `MicBoost.app` are built side by side by build.sh, so
 /// the app can be found relative to wherever this binary actually lives
 /// (following symlinks, since the README has you symlink this into PATH).
 func siblingAppURL() -> URL? {
-    let cliURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+    let cliURL = executablePath().resolvingSymlinksInPath()
     let appURL = cliURL.deletingLastPathComponent().appendingPathComponent("MicBoost.app")
     return FileManager.default.fileExists(atPath: appURL.path) ? appURL : nil
 }
